@@ -1,28 +1,40 @@
 import React, { useState } from 'react';
 import HomePage from './pages/HomePage';
-import PatrimoniosPage from './pages/PatrimoniosPage';
 import ConfiguracoesPage from './pages/ConfiguracoesPage';
-import VisualizacaoPage from './pages/VisualizacaoPage';
-import EtiquetasPage from './pages/EtiquetasPage';
+import PatrimoniosPage from './pages/PatrimoniosPage';
 import ImportacaoPage from './pages/ImportacaoPage';
+import RelatoriosPage from './pages/RelatoriosPage';
+import EtiquetasPage from './pages/EtiquetasPage';
+import VisualizacaoPage from './pages/VisualizacaoPage';
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState('home');
-  const [selectedPatrimonio, setSelectedPatrimonio] = useState(null);
+  const [patrimonio_id, setPatrimonio_id] = useState<string | undefined>();
 
-  const handleNavigate = (page: string, patrimonio?: any) => {
-    setCurrentPage(page);
-    if (patrimonio) setSelectedPatrimonio(patrimonio);
+  const renderPage = () => {
+    switch (currentPage) {
+      case 'home':
+        return <HomePage onNavigate={setCurrentPage} />;
+      case 'configuracoes':
+        return <ConfiguracoesPage onNavigate={setCurrentPage} />;
+      case 'patrimonios':
+        return <PatrimoniosPage onNavigate={setCurrentPage} />;
+      case 'importacao':
+        return <ImportacaoPage onNavigate={setCurrentPage} />;
+      case 'relatorios':
+        return <RelatoriosPage onNavigate={setCurrentPage} />;
+      case 'etiquetas':
+        return <EtiquetasPage onNavigate={setCurrentPage} />;
+      case 'visualizacao':
+        return <VisualizacaoPage patrimonio_id={patrimonio_id} />;
+      default:
+        return <HomePage onNavigate={setCurrentPage} />;
+    }
   };
 
   return (
-    <div>
-      {currentPage === 'home' && <HomePage onNavigate={handleNavigate} />}
-      {currentPage === 'patrimonios' && <PatrimoniosPage onNavigate={handleNavigate} />}
-      {currentPage === 'configuracoes' && <ConfiguracoesPage onNavigate={handleNavigate} />}
-      {currentPage === 'visualizacao' && <VisualizacaoPage patrimonio={selectedPatrimonio} onNavigate={handleNavigate} />}
-      {currentPage === 'etiquetas' && <EtiquetasPage onNavigate={handleNavigate} />}
-      {currentPage === 'importacao' && <ImportacaoPage onNavigate={handleNavigate} />}
+    <div style={{ backgroundColor: 'var(--color-bg)', minHeight: '100vh' }}>
+      {renderPage()}
     </div>
   );
 }

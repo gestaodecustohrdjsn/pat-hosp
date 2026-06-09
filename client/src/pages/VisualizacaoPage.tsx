@@ -1,30 +1,99 @@
 import React, { useState, useEffect } from 'react';
 
 interface VisualizacaoPageProps {
-  patrimonio?: any;
-  onNavigate: (page: string) => void;
+  patrimonio_id?: string;
 }
 
-export default function VisualizacaoPage({ patrimonio, onNavigate }: VisualizacaoPageProps) {
-  const [qrCode, setQrCode] = useState('');
+export default function VisualizacaoPage({ patrimonio_id }: VisualizacaoPageProps) {
+  const [patrimonio, setPatrimonio] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [camposExibicao, setCamposExibicao] = useState({
+    descricao: true,
+    centro: true,
+    data_aquisicao: true,
+    valor: true,
+    tipo: true,
+    status: true,
+  });
 
   useEffect(() => {
-    if (patrimonio?.ID_PATRIMONIO) {
-      // Simular geração de QR Code (em produção, usar biblioteca qrcode)
-      setQrCode(`QR-${patrimonio.ID_PATRIMONIO}`);
+    carregarPatrimonio();
+  }, [patrimonio_id]);
+
+  const carregarPatrimonio = async () => {
+    const id = patrimonio_id || new URLSearchParams(window.location.search).get('id');
+    if (!id) {
+      setLoading(false);
+      return;
     }
-  }, [patrimonio]);
+
+    const apiUrl = localStorage.getItem('pat_hosp_api_url');
+    if (!apiUrl) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'obter', id }),
+      });
+      const data = await response.json();
+      setPatrimonio(data);
+    } catch (error) {
+      console.error('Erro ao carregar patrimônio:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'var(--color-bg)',
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{
+            width: '50px',
+            height: '50px',
+            border: '4px solid var(--color-primary)',
+            borderTop: '4px solid transparent',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+            margin: '0 auto 1rem',
+          }}></div>
+          <p>Carregando...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!patrimonio) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ textAlign: 'center' }}>
-          <p style={{ fontSize: '1.2rem', marginBottom: '1rem' }}>Nenhum patrimônio selecionado</p>
-          <button
-            onClick={() => onNavigate('home')}
-            className="btn btn-primary">
-            Voltar
-          </button>
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'var(--color-bg)',
+      }}>
+        <div style={{
+          textAlign: 'center',
+          padding: '2rem',
+          backgroundColor: 'white',
+          borderRadius: '0.5rem',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+        }}>
+          <h1 style={{ color: 'var(--color-primary)', marginBottom: '1rem' }}>
+            Patrimônio não encontrado
+          </h1>
+          <p style={{ color: 'var(--color-text-secondary)' }}>
+            O ID do patrimônio não foi encontrado no sistema.
+          </p>
         </div>
       </div>
     );
@@ -39,158 +108,245 @@ export default function VisualizacaoPage({ patrimonio, onNavigate }: Visualizaca
       alignItems: 'center',
       justifyContent: 'center',
     }}>
+      <style>{`
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+
+      {/* Card Principal */}
       <div style={{
-        background: 'white',
+        width: '100%',
+        maxWidth: '500px',
+        backgroundColor: 'white',
         borderRadius: '1rem',
         overflow: 'hidden',
-        maxWidth: '600px',
-        width: '100%',
         boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
       }}>
-        {/* Header */}
+        {/* Header com Dourado */}
         <div style={{
-          background: 'linear-gradient(135deg, #990033 0%, #660022 100%)',
-          color: 'white',
+          background: 'linear-gradient(135deg, #D4AF37 0%, #B8941F 100%)',
           padding: '2rem',
           textAlign: 'center',
         }}>
-          <h1 style={{ fontSize: '2rem', fontWeight: '700', marginBottom: '0.5rem' }}>
+          <h1 style={{
+            margin: '0 0 0.5rem 0',
+            fontSize: '1.8rem',
+            fontWeight: '700',
+            color: '#333',
+          }}>
             PATRIMÔNIO
           </h1>
-          <p style={{ fontSize: '0.9rem', opacity: 0.9 }}>
+          <p style={{
+            margin: '0',
+            fontSize: '0.9rem',
+            color: '#555',
+            fontWeight: '600',
+          }}>
             Hospital Regional de Ponta Porã
           </p>
         </div>
 
-        {/* Content */}
-        <div style={{ padding: '2rem' }}>
-          {/* QR Code Area */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: '2rem',
-            marginBottom: '2rem',
-          }}>
-            <div style={{
-              background: '#f0f0f0',
-              border: '2px solid var(--color-border)',
-              borderRadius: '0.5rem',
-              aspectRatio: '1',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '0.9rem',
-              color: 'var(--color-text-secondary)',
-              textAlign: 'center',
-            }}>
-              <div>
-                <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📱</div>
-                <div>QR Code</div>
-              </div>
-            </div>
+        {/* Espaço para Foto */}
+        <div style={{
+          width: '100%',
+          height: '200px',
+          backgroundColor: '#f0f0f0',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderBottom: '2px solid #D4AF37',
+          fontSize: '0.9rem',
+          color: '#999',
+        }}>
+          📷 Foto do Patrimônio
+        </div>
 
-            {/* ID Box */}
-            <div style={{
-              background: '#000000',
-              color: 'white',
-              borderRadius: '0.5rem',
-              display: 'flex',
-              alignItems: 'flex-end',
-              justifyContent: 'center',
-              padding: '1rem',
-              minHeight: '120px',
-            }}>
-              <div style={{
-                fontSize: '1.8rem',
-                fontWeight: '700',
-                fontFamily: 'monospace',
-                textAlign: 'center',
-                wordBreak: 'break-all',
-              }}>
-                {patrimonio.ID_PATRIMONIO}
-              </div>
-            </div>
+        {/* Informações */}
+        <div style={{ padding: '2rem' }}>
+          {/* ID em Destaque */}
+          <div style={{
+            backgroundColor: '#990033',
+            color: 'white',
+            padding: '1rem',
+            borderRadius: '0.5rem',
+            textAlign: 'center',
+            marginBottom: '1.5rem',
+            fontFamily: 'monospace',
+            fontSize: '1.3rem',
+            fontWeight: '700',
+            letterSpacing: '1px',
+          }}>
+            {patrimonio.ID_PATRIMONIO}
           </div>
 
-          {/* Informações */}
-          <div style={{
-            borderTop: '2px solid var(--color-border)',
-            paddingTop: '1.5rem',
-          }}>
-            <h2 style={{
-              fontSize: '1.2rem',
-              fontWeight: '700',
-              color: 'var(--color-primary)',
-              marginBottom: '1rem',
-            }}>
-              Informações
-            </h2>
-
-            <div style={{ display: 'grid', gap: '1rem' }}>
+          {/* Campos Dinâmicos */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {camposExibicao.descricao && (
               <div>
                 <label style={{
                   display: 'block',
-                  fontSize: '0.875rem',
-                  fontWeight: '600',
-                  color: 'var(--color-text-secondary)',
+                  fontSize: '0.8rem',
+                  fontWeight: '700',
+                  color: '#D4AF37',
+                  textTransform: 'uppercase',
                   marginBottom: '0.25rem',
+                  letterSpacing: '0.5px',
                 }}>
                   Descrição
                 </label>
-                <p style={{ fontSize: '1rem', color: 'var(--color-text)' }}>
+                <p style={{
+                  margin: '0',
+                  fontSize: '1rem',
+                  color: '#333',
+                  fontWeight: '500',
+                }}>
                   {patrimonio.DESCRICAO}
                 </p>
               </div>
+            )}
 
+            {camposExibicao.centro && (
               <div>
                 <label style={{
                   display: 'block',
-                  fontSize: '0.875rem',
-                  fontWeight: '600',
-                  color: 'var(--color-text-secondary)',
+                  fontSize: '0.8rem',
+                  fontWeight: '700',
+                  color: '#D4AF37',
+                  textTransform: 'uppercase',
                   marginBottom: '0.25rem',
+                  letterSpacing: '0.5px',
                 }}>
                   Centro de Custo
                 </label>
-                <p style={{ fontSize: '1rem', color: 'var(--color-text)' }}>
+                <p style={{
+                  margin: '0',
+                  fontSize: '1rem',
+                  color: '#333',
+                  fontWeight: '500',
+                }}>
                   {patrimonio.CENTRO_CUSTO}
                 </p>
               </div>
+            )}
 
+            {camposExibicao.tipo && (
               <div>
                 <label style={{
                   display: 'block',
-                  fontSize: '0.875rem',
-                  fontWeight: '600',
-                  color: 'var(--color-text-secondary)',
+                  fontSize: '0.8rem',
+                  fontWeight: '700',
+                  color: '#D4AF37',
+                  textTransform: 'uppercase',
                   marginBottom: '0.25rem',
+                  letterSpacing: '0.5px',
+                }}>
+                  Tipo
+                </label>
+                <p style={{
+                  margin: '0',
+                  fontSize: '1rem',
+                  color: '#333',
+                  fontWeight: '500',
+                }}>
+                  {patrimonio.TIPO}
+                </p>
+              </div>
+            )}
+
+            {camposExibicao.data_aquisicao && (
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.8rem',
+                  fontWeight: '700',
+                  color: '#D4AF37',
+                  textTransform: 'uppercase',
+                  marginBottom: '0.25rem',
+                  letterSpacing: '0.5px',
+                }}>
+                  Data de Aquisição
+                </label>
+                <p style={{
+                  margin: '0',
+                  fontSize: '1rem',
+                  color: '#333',
+                  fontWeight: '500',
+                }}>
+                  {patrimonio.DATA_AQUISICAO}
+                </p>
+              </div>
+            )}
+
+            {camposExibicao.valor && (
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.8rem',
+                  fontWeight: '700',
+                  color: '#D4AF37',
+                  textTransform: 'uppercase',
+                  marginBottom: '0.25rem',
+                  letterSpacing: '0.5px',
+                }}>
+                  Valor
+                </label>
+                <p style={{
+                  margin: '0',
+                  fontSize: '1rem',
+                  color: '#333',
+                  fontWeight: '500',
+                }}>
+                  R$ {patrimonio.VALOR?.toFixed(2) || '0.00'}
+                </p>
+              </div>
+            )}
+
+            {camposExibicao.status && (
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.8rem',
+                  fontWeight: '700',
+                  color: '#D4AF37',
+                  textTransform: 'uppercase',
+                  marginBottom: '0.25rem',
+                  letterSpacing: '0.5px',
                 }}>
                   Status
                 </label>
                 <p style={{
-                  fontSize: '1rem',
-                  color: patrimonio.STATUS === 'ATIVO' ? 'var(--color-success)' : 'var(--color-error)',
+                  margin: '0',
+                  display: 'inline-block',
+                  fontSize: '0.9rem',
+                  padding: '0.25rem 0.75rem',
+                  borderRadius: '0.25rem',
+                  backgroundColor: patrimonio.STATUS === 'ATIVO' ? '#10B98133' : '#DC262633',
+                  color: patrimonio.STATUS === 'ATIVO' ? '#10B981' : '#DC2626',
                   fontWeight: '600',
                 }}>
                   {patrimonio.STATUS}
                 </p>
               </div>
-            </div>
+            )}
           </div>
         </div>
 
         {/* Footer */}
         <div style={{
-          background: '#f9f8f6',
+          backgroundColor: '#f9f9f9',
           padding: '1rem',
           textAlign: 'center',
-          borderTop: '1px solid var(--color-border)',
+          borderTop: '1px solid #eee',
+          fontSize: '0.8rem',
+          color: '#999',
         }}>
-          <button
-            onClick={() => onNavigate('home')}
-            className="btn btn-primary">
-            Voltar
-          </button>
+          <p style={{ margin: '0' }}>
+            Sistema de Gestão de Patrimônio Hospitalar
+          </p>
+          <p style={{ margin: '0.25rem 0 0 0' }}>
+            {new Date().toLocaleDateString('pt-BR')}
+          </p>
         </div>
       </div>
     </div>
