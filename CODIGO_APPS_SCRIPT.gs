@@ -1,8 +1,15 @@
-// PAT.HOSP - Google Apps Script Backend
-// Sistema de Controle de Patrimônio Hospitalar
+// PAT.HOSP - Sistema de Gestão de Patrimônio Hospitalar
+// Google Apps Script Backend v2.0 - Completo com ID Generation e Todas as Operações
 
-const SHEET_NAME_PATRIMONIO = "Patrimonio";
-const SHEET_NAME_HISTORICO = "Historico";
+const SHEET_PATRIMONIO = "Patrimonio";
+const SHEET_HISTORICO = "Historico";
+const SHEET_MOVIMENTACOES = "Movimentacoes";
+const SHEET_INATIVOS = "Inativos";
+const SHEET_CONTADORES = "Contadores";
+
+// ============================================
+// INICIALIZAÇÃO E SETUP
+// ============================================
 
 function doPost(e) {
   try {
@@ -10,243 +17,474 @@ function doPost(e) {
     const action = data.action;
 
     switch (action) {
-      case "test":
-        return ContentService.createTextOutput(JSON.stringify({ success: true }))
+      case 'test':
+        return ContentService.createTextOutput(JSON.stringify({ status: 'ok' }))
           .setMimeType(ContentService.MimeType.JSON);
-
-      case "listar":
-        return listarPatrimonios();
-
-      case "obter":
-        return obterPatrimonio(data.id);
-
-      case "adicionar":
-        return adicionarPatrimonio(data.patrimonio);
-
-      case "editar":
-        return editarPatrimonio(data.id, data.patrimonio);
-
-      case "movimentar":
-        return movimentarPatrimonio(data.id, data.centroCusto, data.motivo);
-
-      case "historico":
-        return obterHistorico(data.id);
-
+      
+      case 'listar':
+        return ContentService.createTextOutput(JSON.stringify(listarPatrimonios()))
+          .setMimeType(ContentService.MimeType.JSON);
+      
+      case 'obter':
+        return ContentService.createTextOutput(JSON.stringify(obterPatrimonio(data.id)))
+          .setMimeType(ContentService.MimeType.JSON);
+      
+      case 'adicionar':
+        return ContentService.createTextOutput(JSON.stringify(adicionarPatrimonio(data)))
+          .setMimeType(ContentService.MimeType.JSON);
+      
+      case 'editar':
+        return ContentService.createTextOutput(JSON.stringify(editarPatrimonio(data)))
+          .setMimeType(ContentService.MimeType.JSON);
+      
+      case 'remover':
+        return ContentService.createTextOutput(JSON.stringify(removerPatrimonio(data.id)))
+          .setMimeType(ContentService.MimeType.JSON);
+      
+      case 'ativar':
+        return ContentService.createTextOutput(JSON.stringify(ativarPatrimonio(data.id)))
+          .setMimeType(ContentService.MimeType.JSON);
+      
+      case 'inativar':
+        return ContentService.createTextOutput(JSON.stringify(inativarPatrimonio(data.id)))
+          .setMimeType(ContentService.MimeType.JSON);
+      
+      case 'movimentar':
+        return ContentService.createTextOutput(JSON.stringify(movimentarPatrimonio(data)))
+          .setMimeType(ContentService.MimeType.JSON);
+      
+      case 'listarMovimentacoes':
+        return ContentService.createTextOutput(JSON.stringify(listarMovimentacoes(data)))
+          .setMimeType(ContentService.MimeType.JSON);
+      
+      case 'importar':
+        return ContentService.createTextOutput(JSON.stringify(importarPatrimonios(data.patrimonios)))
+          .setMimeType(ContentService.MimeType.JSON);
+      
+      case 'gerarRelatorio':
+        return ContentService.createTextOutput(JSON.stringify(gerarRelatorio(data)))
+          .setMimeType(ContentService.MimeType.JSON);
+      
+      case 'listarInativos':
+        return ContentService.createTextOutput(JSON.stringify(listarInativos()))
+          .setMimeType(ContentService.MimeType.JSON);
+      
+      case 'estatisticas':
+        return ContentService.createTextOutput(JSON.stringify(obterEstatisticas()))
+          .setMimeType(ContentService.MimeType.JSON);
+      
       default:
-        return ContentService.createTextOutput(JSON.stringify({ error: "Ação não reconhecida" }))
+        return ContentService.createTextOutput(JSON.stringify({ error: 'Ação não encontrada' }))
           .setMimeType(ContentService.MimeType.JSON);
     }
   } catch (error) {
-    return ContentService.createTextOutput(JSON.stringify({ error: error.message }))
+    return ContentService.createTextOutput(JSON.stringify({ error: error.toString() }))
       .setMimeType(ContentService.MimeType.JSON);
   }
 }
 
-function inicializarPlanilha() {
+// ============================================
+// GERADOR DE IDs AUTOMÁTICO
+// ============================================
+
+function gerarNovoID(tipo = 'GER', centroCusto = '0001') {
+  const sheet = obterOuCriarSheet(SHEET_CONTADORES);
+  const dados = sheet.getDataRange().getValues();
+  
+  let contador = 1;
+  let linha = -1;
+  
+  // Procura linha existente para este tipo/centro
+  for (let i = 1; i < dados.length; i++) {
+    if (dados[i][0] === tipo && dados[i][1] === centroCusto) {
+      contador = parseInt(dados[i][2]) + 1;
+      linha = i + 1;
+      break;
+    }
+  }
+  
+  // Se não encontrou, cria nova linha
+  if (linha === -1) {
+    linha = dados.length + 1;
+  }
+  
+  // Atualiza contador
+  sheet.getRange(linha, 1).setValue(tipo);
+  sheet.getRange(linha, 2).setValue(centroCusto);
+  sheet.getRange(linha, 3).setValue(contador);
+  
+  // Formata ID: {TIPO}{CENTRO}{MES}{ANO}{NUMERO}
+  const mes = String(new Date().getMonth() + 1).padStart(2, '0');
+  const ano = String(new Date().getFullYear()).slice(-2);
+  const num = String(contador).padStart(4, '0');
+  
+  return `${tipo}${centroCusto}${mes}${ano}${num}`;
+}
+
+// ============================================
+// GERENCIAMENTO DE SHEETS
+// ============================================
+
+function obterOuCriarSheet(nomePlanilha) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-
-  // Criar aba Patrimonio se não existir
-  if (!ss.getSheetByName(SHEET_NAME_PATRIMONIO)) {
-    const sheet = ss.insertSheet(SHEET_NAME_PATRIMONIO);
-    sheet.appendRow([
-      "ID_PATRIMONIO",
-      "DESCRICAO",
-      "CENTRO_CUSTO",
-      "SIGEM",
-      "STATUS",
-      "DATA_AQUISICAO",
-      "VALOR",
-      "LOCALIZACAO",
-      "RESPONSAVEL",
-      "DATA_CRIACAO",
-    ]);
+  let sheet = ss.getSheetByName(nomePlanilha);
+  
+  if (!sheet) {
+    sheet = ss.insertSheet(nomePlanilha);
+    
+    // Adiciona headers baseado no tipo de sheet
+    if (nomePlanilha === SHEET_PATRIMONIO) {
+      sheet.appendRow([
+        'ID_PATRIMONIO', 'DESCRICAO', 'TIPO', 'CENTRO_CUSTO', 'DATA_AQUISICAO',
+        'VALOR', 'STATUS', 'DATA_CADASTRO', 'OBSERVACOES'
+      ]);
+    } else if (nomePlanilha === SHEET_HISTORICO) {
+      sheet.appendRow([
+        'ID_PATRIMONIO', 'ACAO', 'DESCRICAO', 'DATA_HORA', 'USUARIO'
+      ]);
+    } else if (nomePlanilha === SHEET_MOVIMENTACOES) {
+      sheet.appendRow([
+        'ID_PATRIMONIO', 'CENTRO_ORIGEM', 'CENTRO_DESTINO', 'DATA_MOVIMENTACAO', 'MOTIVO'
+      ]);
+    } else if (nomePlanilha === SHEET_INATIVOS) {
+      sheet.appendRow([
+        'ID_PATRIMONIO', 'DESCRICAO', 'TIPO', 'CENTRO_CUSTO', 'DATA_INATIVACAO', 'MOTIVO'
+      ]);
+    } else if (nomePlanilha === SHEET_CONTADORES) {
+      sheet.appendRow(['TIPO', 'CENTRO_CUSTO', 'CONTADOR']);
+    }
   }
-
-  // Criar aba Historico se não existir
-  if (!ss.getSheetByName(SHEET_NAME_HISTORICO)) {
-    const sheet = ss.insertSheet(SHEET_NAME_HISTORICO);
-    sheet.appendRow([
-      "ID_PATRIMONIO",
-      "DATA",
-      "TIPO",
-      "CENTRO_ORIGEM",
-      "CENTRO_DESTINO",
-      "DESCRICAO",
-      "USUARIO",
-    ]);
-  }
+  
+  return sheet;
 }
 
-function gerarIDPatrimonio() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME_PATRIMONIO);
-  const rows = sheet.getDataRange().getValues();
-  const lastRow = rows.length;
-
-  const hoje = new Date();
-  const mes = String(hoje.getMonth() + 1).padStart(2, "0");
-  const ano = String(hoje.getFullYear()).slice(-2);
-  const numero = String(lastRow).padStart(4, "0");
-
-  return `PAT${mes}${ano}${numero}`;
-}
+// ============================================
+// OPERAÇÕES DE PATRIMÔNIO
+// ============================================
 
 function listarPatrimonios() {
-  inicializarPlanilha();
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME_PATRIMONIO);
-  const data = sheet.getDataRange().getValues();
-
-  const patrimonio = [];
-  for (let i = 1; i < data.length; i++) {
-    patrimonio.push({
-      ID_PATRIMONIO: data[i][0],
-      DESCRICAO: data[i][1],
-      CENTRO_CUSTO: data[i][2],
-      SIGEM: data[i][3],
-      STATUS: data[i][4],
-      DATA_AQUISICAO: data[i][5],
-      VALOR: data[i][6],
-      LOCALIZACAO: data[i][7],
-      RESPONSAVEL: data[i][8],
+  const sheet = obterOuCriarSheet(SHEET_PATRIMONIO);
+  const dados = sheet.getDataRange().getValues();
+  const resultado = [];
+  
+  for (let i = 1; i < dados.length; i++) {
+    resultado.push({
+      ID_PATRIMONIO: dados[i][0],
+      DESCRICAO: dados[i][1],
+      TIPO: dados[i][2],
+      CENTRO_CUSTO: dados[i][3],
+      DATA_AQUISICAO: dados[i][4],
+      VALOR: dados[i][5],
+      STATUS: dados[i][6],
+      DATA_CADASTRO: dados[i][7],
+      OBSERVACOES: dados[i][8]
     });
   }
-
-  return ContentService.createTextOutput(JSON.stringify(patrimonio))
-    .setMimeType(ContentService.MimeType.JSON);
+  
+  return resultado;
 }
 
 function obterPatrimonio(id) {
-  inicializarPlanilha();
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME_PATRIMONIO);
-  const data = sheet.getDataRange().getValues();
-
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][0] === id) {
-      return ContentService.createTextOutput(
-        JSON.stringify({
-          ID_PATRIMONIO: data[i][0],
-          DESCRICAO: data[i][1],
-          CENTRO_CUSTO: data[i][2],
-          SIGEM: data[i][3],
-          STATUS: data[i][4],
-          DATA_AQUISICAO: data[i][5],
-          VALOR: data[i][6],
-          LOCALIZACAO: data[i][7],
-          RESPONSAVEL: data[i][8],
-        })
-      ).setMimeType(ContentService.MimeType.JSON);
+  const sheet = obterOuCriarSheet(SHEET_PATRIMONIO);
+  const dados = sheet.getDataRange().getValues();
+  
+  for (let i = 1; i < dados.length; i++) {
+    if (dados[i][0] === id) {
+      return {
+        ID_PATRIMONIO: dados[i][0],
+        DESCRICAO: dados[i][1],
+        TIPO: dados[i][2],
+        CENTRO_CUSTO: dados[i][3],
+        DATA_AQUISICAO: dados[i][4],
+        VALOR: dados[i][5],
+        STATUS: dados[i][6],
+        DATA_CADASTRO: dados[i][7],
+        OBSERVACOES: dados[i][8]
+      };
     }
   }
-
-  return ContentService.createTextOutput(JSON.stringify(null))
-    .setMimeType(ContentService.MimeType.JSON);
+  
+  return null;
 }
 
-function adicionarPatrimonio(patrimonio) {
-  inicializarPlanilha();
-  const id = gerarIDPatrimonio();
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME_PATRIMONIO);
-
+function adicionarPatrimonio(dados) {
+  const sheet = obterOuCriarSheet(SHEET_PATRIMONIO);
+  
+  // Gera novo ID
+  const tipo = (dados.tipo || 'GER').substring(0, 3).toUpperCase();
+  const centro = (dados.centro_custo || '0001').substring(0, 4);
+  const novoID = gerarNovoID(tipo, centro);
+  
+  // Adiciona à planilha
   sheet.appendRow([
-    id,
-    patrimonio.DESCRICAO,
-    patrimonio.CENTRO_CUSTO,
-    patrimonio.SIGEM || "",
-    patrimonio.STATUS || "ATIVO",
-    patrimonio.DATA_AQUISICAO || new Date().toISOString().split("T")[0],
-    patrimonio.VALOR || 0,
-    patrimonio.LOCALIZACAO || "",
-    patrimonio.RESPONSAVEL || "",
-    new Date().toISOString(),
-  ]);
-
-  // Registrar no histórico
-  registrarHistorico(id, "CADASTRO", "", patrimonio.CENTRO_CUSTO, `Patrimônio cadastrado: ${patrimonio.DESCRICAO}`);
-
-  return ContentService.createTextOutput(JSON.stringify({ id, success: true }))
-    .setMimeType(ContentService.MimeType.JSON);
-}
-
-function editarPatrimonio(id, patrimonio) {
-  inicializarPlanilha();
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME_PATRIMONIO);
-  const data = sheet.getDataRange().getValues();
-
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][0] === id) {
-      if (patrimonio.DESCRICAO) sheet.getRange(i + 1, 2).setValue(patrimonio.DESCRICAO);
-      if (patrimonio.CENTRO_CUSTO) sheet.getRange(i + 1, 3).setValue(patrimonio.CENTRO_CUSTO);
-      if (patrimonio.SIGEM) sheet.getRange(i + 1, 4).setValue(patrimonio.SIGEM);
-      if (patrimonio.STATUS) sheet.getRange(i + 1, 5).setValue(patrimonio.STATUS);
-      if (patrimonio.LOCALIZACAO) sheet.getRange(i + 1, 8).setValue(patrimonio.LOCALIZACAO);
-      if (patrimonio.RESPONSAVEL) sheet.getRange(i + 1, 9).setValue(patrimonio.RESPONSAVEL);
-
-      registrarHistorico(id, "ALTERACAO", "", patrimonio.CENTRO_CUSTO || data[i][2], "Patrimônio alterado");
-
-      return ContentService.createTextOutput(JSON.stringify({ success: true }))
-        .setMimeType(ContentService.MimeType.JSON);
-    }
-  }
-
-  return ContentService.createTextOutput(JSON.stringify({ success: false }))
-    .setMimeType(ContentService.MimeType.JSON);
-}
-
-function movimentarPatrimonio(id, centroCusto, motivo) {
-  inicializarPlanilha();
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME_PATRIMONIO);
-  const data = sheet.getDataRange().getValues();
-
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][0] === id) {
-      const centroAnterior = data[i][2];
-      sheet.getRange(i + 1, 3).setValue(centroCusto);
-
-      registrarHistorico(id, "MOVIMENTACAO", centroAnterior, centroCusto, motivo);
-
-      return ContentService.createTextOutput(JSON.stringify({ success: true }))
-        .setMimeType(ContentService.MimeType.JSON);
-    }
-  }
-
-  return ContentService.createTextOutput(JSON.stringify({ success: false }))
-    .setMimeType(ContentService.MimeType.JSON);
-}
-
-function registrarHistorico(id, tipo, centroOrigem, centroDestino, descricao) {
-  inicializarPlanilha();
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME_HISTORICO);
-
-  sheet.appendRow([
-    id,
-    new Date().toISOString(),
+    novoID,
+    dados.descricao || '',
     tipo,
-    centroOrigem,
-    centroDestino,
+    centro,
+    dados.data_aquisicao || new Date().toLocaleDateString('pt-BR'),
+    dados.valor || 0,
+    'ATIVO',
+    new Date().toLocaleString('pt-BR'),
+    dados.observacoes || ''
+  ]);
+  
+  // Registra no histórico
+  registrarHistorico(novoID, 'CADASTRO', `Patrimônio cadastrado: ${dados.descricao}`);
+  
+  return { success: true, id: novoID, message: 'Patrimônio adicionado com sucesso' };
+}
+
+function editarPatrimonio(dados) {
+  const sheet = obterOuCriarSheet(SHEET_PATRIMONIO);
+  const sheetDados = sheet.getDataRange().getValues();
+  
+  for (let i = 1; i < sheetDados.length; i++) {
+    if (sheetDados[i][0] === dados.id) {
+      if (dados.descricao) sheet.getRange(i + 1, 2).setValue(dados.descricao);
+      if (dados.tipo) sheet.getRange(i + 1, 3).setValue(dados.tipo);
+      if (dados.data_aquisicao) sheet.getRange(i + 1, 5).setValue(dados.data_aquisicao);
+      if (dados.valor !== undefined) sheet.getRange(i + 1, 6).setValue(dados.valor);
+      if (dados.observacoes) sheet.getRange(i + 1, 9).setValue(dados.observacoes);
+      
+      registrarHistorico(dados.id, 'ALTERACAO', 'Patrimônio alterado');
+      
+      return { success: true, message: 'Patrimônio editado com sucesso' };
+    }
+  }
+  
+  return { success: false, error: 'Patrimônio não encontrado' };
+}
+
+function removerPatrimonio(id) {
+  const sheet = obterOuCriarSheet(SHEET_PATRIMONIO);
+  const sheetDados = sheet.getDataRange().getValues();
+  
+  for (let i = 1; i < sheetDados.length; i++) {
+    if (sheetDados[i][0] === id) {
+      sheet.deleteRow(i + 1);
+      registrarHistorico(id, 'EXCLUSAO', 'Patrimônio removido');
+      return { success: true, message: 'Patrimônio removido com sucesso' };
+    }
+  }
+  
+  return { success: false, error: 'Patrimônio não encontrado' };
+}
+
+function ativarPatrimonio(id) {
+  const sheet = obterOuCriarSheet(SHEET_PATRIMONIO);
+  const sheetDados = sheet.getDataRange().getValues();
+  
+  for (let i = 1; i < sheetDados.length; i++) {
+    if (sheetDados[i][0] === id) {
+      sheet.getRange(i + 1, 7).setValue('ATIVO');
+      registrarHistorico(id, 'ATIVACAO', 'Patrimônio ativado');
+      return { success: true, message: 'Patrimônio ativado com sucesso' };
+    }
+  }
+  
+  return { success: false, error: 'Patrimônio não encontrado' };
+}
+
+function inativarPatrimonio(id) {
+  const sheet = obterOuCriarSheet(SHEET_PATRIMONIO);
+  const sheetDados = sheet.getDataRange().getValues();
+  
+  for (let i = 1; i < sheetDados.length; i++) {
+    if (sheetDados[i][0] === id) {
+      const patrimonio = sheetDados[i];
+      
+      // Move para inativos
+      const sheetInativos = obterOuCriarSheet(SHEET_INATIVOS);
+      sheetInativos.appendRow([
+        patrimonio[0],
+        patrimonio[1],
+        patrimonio[2],
+        patrimonio[3],
+        new Date().toLocaleString('pt-BR'),
+        'Inativado pelo sistema'
+      ]);
+      
+      // Remove do ativo
+      sheet.deleteRow(i + 1);
+      registrarHistorico(id, 'INATIVACAO', 'Patrimônio inativado');
+      
+      return { success: true, message: 'Patrimônio inativado com sucesso' };
+    }
+  }
+  
+  return { success: false, error: 'Patrimônio não encontrado' };
+}
+
+// ============================================
+// MOVIMENTAÇÕES
+// ============================================
+
+function movimentarPatrimonio(dados) {
+  const sheet = obterOuCriarSheet(SHEET_PATRIMONIO);
+  const sheetDados = sheet.getDataRange().getValues();
+  
+  for (let i = 1; i < sheetDados.length; i++) {
+    if (sheetDados[i][0] === dados.id) {
+      const centroOrigem = sheetDados[i][3];
+      
+      // Atualiza centro de custo
+      sheet.getRange(i + 1, 4).setValue(dados.centro_destino);
+      
+      // Registra movimentação
+      const sheetMov = obterOuCriarSheet(SHEET_MOVIMENTACOES);
+      sheetMov.appendRow([
+        dados.id,
+        centroOrigem,
+        dados.centro_destino,
+        new Date().toLocaleString('pt-BR'),
+        dados.motivo || 'Movimentação'
+      ]);
+      
+      registrarHistorico(dados.id, 'MOVIMENTACAO', `Movido de ${centroOrigem} para ${dados.centro_destino}`);
+      
+      return { success: true, message: 'Patrimônio movimentado com sucesso' };
+    }
+  }
+  
+  return { success: false, error: 'Patrimônio não encontrado' };
+}
+
+function listarMovimentacoes(filtros = {}) {
+  const sheet = obterOuCriarSheet(SHEET_MOVIMENTACOES);
+  const dados = sheet.getDataRange().getValues();
+  const resultado = [];
+  
+  for (let i = 1; i < dados.length; i++) {
+    const mov = {
+      ID_PATRIMONIO: dados[i][0],
+      CENTRO_ORIGEM: dados[i][1],
+      CENTRO_DESTINO: dados[i][2],
+      DATA_MOVIMENTACAO: dados[i][3],
+      MOTIVO: dados[i][4]
+    };
+    
+    // Aplica filtros
+    if (filtros.id && mov.ID_PATRIMONIO !== filtros.id) continue;
+    if (filtros.centro && mov.CENTRO_ORIGEM !== filtros.centro && mov.CENTRO_DESTINO !== filtros.centro) continue;
+    
+    resultado.push(mov);
+  }
+  
+  return resultado;
+}
+
+// ============================================
+// HISTÓRICO
+// ============================================
+
+function registrarHistorico(id, acao, descricao) {
+  const sheet = obterOuCriarSheet(SHEET_HISTORICO);
+  sheet.appendRow([
+    id,
+    acao,
     descricao,
-    Session.getActiveUser().getEmail(),
+    new Date().toLocaleString('pt-BR'),
+    Session.getActiveUser().getEmail()
   ]);
 }
 
-function obterHistorico(id) {
-  inicializarPlanilha();
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME_HISTORICO);
-  const data = sheet.getDataRange().getValues();
+// ============================================
+// IMPORTAÇÃO
+// ============================================
 
-  const historico = [];
-  for (let i = 1; i < data.length; i++) {
-    if (!id || data[i][0] === id) {
-      historico.push({
-        ID_PATRIMONIO: data[i][0],
-        DATA: data[i][1],
-        TIPO: data[i][2],
-        CENTRO_ORIGEM: data[i][3],
-        CENTRO_DESTINO: data[i][4],
-        DESCRICAO: data[i][5],
-        USUARIO: data[i][6],
-      });
-    }
+function importarPatrimonios(patrimonios) {
+  const resultados = [];
+  
+  for (let i = 0; i < patrimonios.length; i++) {
+    const p = patrimonios[i];
+    const resultado = adicionarPatrimonio({
+      descricao: p.descricao,
+      tipo: p.tipo || 'GER',
+      centro_custo: p.centro_custo || '0001',
+      data_aquisicao: p.data_aquisicao,
+      valor: p.valor || 0,
+      observacoes: p.observacoes || ''
+    });
+    
+    resultados.push(resultado);
   }
+  
+  return { success: true, total: resultados.length, resultados: resultados };
+}
 
-  return ContentService.createTextOutput(JSON.stringify(historico))
-    .setMimeType(ContentService.MimeType.JSON);
+// ============================================
+// RELATÓRIOS E ESTATÍSTICAS
+// ============================================
+
+function gerarRelatorio(filtros = {}) {
+  const patrimonios = listarPatrimonios();
+  let resultado = patrimonios;
+  
+  // Aplica filtros
+  if (filtros.centro_custo) {
+    resultado = resultado.filter(p => p.CENTRO_CUSTO === filtros.centro_custo);
+  }
+  if (filtros.status) {
+    resultado = resultado.filter(p => p.STATUS === filtros.status);
+  }
+  if (filtros.tipo) {
+    resultado = resultado.filter(p => p.TIPO === filtros.tipo);
+  }
+  
+  // Calcula estatísticas
+  const stats = {
+    total: resultado.length,
+    por_tipo: {},
+    por_centro: {},
+    por_status: {}
+  };
+  
+  resultado.forEach(p => {
+    stats.por_tipo[p.TIPO] = (stats.por_tipo[p.TIPO] || 0) + 1;
+    stats.por_centro[p.CENTRO_CUSTO] = (stats.por_centro[p.CENTRO_CUSTO] || 0) + 1;
+    stats.por_status[p.STATUS] = (stats.por_status[p.STATUS] || 0) + 1;
+  });
+  
+  return { dados: resultado, estatisticas: stats };
+}
+
+function obterEstatisticas() {
+  const patrimonios = listarPatrimonios();
+  const stats = {
+    total: patrimonios.length,
+    ativos: patrimonios.filter(p => p.STATUS === 'ATIVO').length,
+    inativos: listarInativos().length,
+    por_tipo: {},
+    por_centro: {}
+  };
+  
+  patrimonios.forEach(p => {
+    stats.por_tipo[p.TIPO] = (stats.por_tipo[p.TIPO] || 0) + 1;
+    stats.por_centro[p.CENTRO_CUSTO] = (stats.por_centro[p.CENTRO_CUSTO] || 0) + 1;
+  });
+  
+  return stats;
+}
+
+// ============================================
+// INATIVOS
+// ============================================
+
+function listarInativos() {
+  const sheet = obterOuCriarSheet(SHEET_INATIVOS);
+  const dados = sheet.getDataRange().getValues();
+  const resultado = [];
+  
+  for (let i = 1; i < dados.length; i++) {
+    resultado.push({
+      ID_PATRIMONIO: dados[i][0],
+      DESCRICAO: dados[i][1],
+      TIPO: dados[i][2],
+      CENTRO_CUSTO: dados[i][3],
+      DATA_INATIVACAO: dados[i][4],
+      MOTIVO: dados[i][5]
+    });
+  }
+  
+  return resultado;
 }
