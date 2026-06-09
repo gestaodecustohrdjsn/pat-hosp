@@ -1,29 +1,34 @@
-import { Route, Switch } from "wouter";
-import { Toaster } from "sonner";
-import Home from "@/pages/Home";
-import ConfiguracoesPage from "@/pages/ConfiguracoesPage";
-import VisualizacaoPage from "@/pages/VisualizacaoPage";
-import EtiquetasPage from "@/pages/EtiquetasPage";
+import { useState } from 'react';
+import HomePage from './pages/HomePage';
+import ConfiguracoesPage from './pages/ConfiguracoesPage';
+import PatrimoniosPage from './pages/PatrimoniosPage';
+import VisualizacaoPage from './pages/VisualizacaoPage';
+import EtiquetasPage from './pages/EtiquetasPage';
 
-function Router() {
+export default function App() {
+  const [currentPage, setCurrentPage] = useState('home');
+  const [patrimonio, setPatrimonio] = useState<any>(null);
+
+  const renderPage = () => {
+    switch (currentPage) {
+      case 'home':
+        return <HomePage onNavigate={setCurrentPage} />;
+      case 'configuracoes':
+        return <ConfiguracoesPage onNavigate={setCurrentPage} />;
+      case 'patrimonios':
+        return <PatrimoniosPage onNavigate={setCurrentPage} />;
+      case 'visualizacao':
+        return <VisualizacaoPage patrimonio={patrimonio} onNavigate={setCurrentPage} />;
+      case 'etiquetas':
+        return <EtiquetasPage onNavigate={setCurrentPage} />;
+      default:
+        return <HomePage onNavigate={setCurrentPage} />;
+    }
+  };
+
   return (
-    <Switch>
-      <Route path={"/"} component={Home} />
-      <Route path={"/configuracoes"} component={ConfiguracoesPage} />
-      <Route path={"/patrimonio/:id"} component={VisualizacaoPage} />
-      <Route path={"/etiquetas"} component={EtiquetasPage} />
-      <Route component={Home} />
-    </Switch>
+    <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg)' }}>
+      {renderPage()}
+    </div>
   );
 }
-
-function App() {
-  return (
-    <>
-      <Toaster />
-      <Router />
-    </>
-  );
-}
-
-export default App;

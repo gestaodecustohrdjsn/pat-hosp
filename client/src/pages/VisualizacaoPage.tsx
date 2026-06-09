@@ -1,88 +1,196 @@
-import { useParams } from "wouter";
-import { usePatrimonioDetail } from "@/hooks/usePatrimonio";
-import { Loader2 } from "lucide-react";
+import React, { useState, useEffect } from 'react';
 
-export default function VisualizacaoPage() {
-  const { id } = useParams<{ id: string }>();
-  const { patrimonio, historico, loading, error } = usePatrimonioDetail(id || "");
+interface VisualizacaoPageProps {
+  patrimonio?: any;
+  onNavigate: (page: string) => void;
+}
 
-  if (loading) {
+export default function VisualizacaoPage({ patrimonio, onNavigate }: VisualizacaoPageProps) {
+  const [qrCode, setQrCode] = useState('');
+
+  useEffect(() => {
+    if (patrimonio?.ID_PATRIMONIO) {
+      // Simular geração de QR Code (em produção, usar biblioteca qrcode)
+      setQrCode(`QR-${patrimonio.ID_PATRIMONIO}`);
+    }
+  }, [patrimonio]);
+
+  if (!patrimonio) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
-      </div>
-    );
-  }
-
-  if (error || !patrimonio) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-slate-900 mb-2">Patrimônio não encontrado</h1>
-          <p className="text-slate-600">{error || "ID inválido"}</p>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ textAlign: 'center' }}>
+          <p style={{ fontSize: '1.2rem', marginBottom: '1rem' }}>Nenhum patrimônio selecionado</p>
+          <button
+            onClick={() => onNavigate('home')}
+            className="btn btn-primary">
+            Voltar
+          </button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#990033] to-[#660022] p-8">
-      <div className="max-w-2xl mx-auto">
+    <div style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #990033 0%, #660022 100%)',
+      padding: '2rem',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+    }}>
+      <div style={{
+        background: 'white',
+        borderRadius: '1rem',
+        overflow: 'hidden',
+        maxWidth: '600px',
+        width: '100%',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+      }}>
         {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">PATRIMÔNIO</h1>
-          <p className="text-[#D4AF37]">Hospital Regional de Ponta Porã</p>
+        <div style={{
+          background: 'linear-gradient(135deg, #990033 0%, #660022 100%)',
+          color: 'white',
+          padding: '2rem',
+          textAlign: 'center',
+        }}>
+          <h1 style={{ fontSize: '2rem', fontWeight: '700', marginBottom: '0.5rem' }}>
+            PATRIMÔNIO
+          </h1>
+          <p style={{ fontSize: '0.9rem', opacity: 0.9 }}>
+            Hospital Regional de Ponta Porã
+          </p>
         </div>
 
-        {/* Card */}
-        <div className="bg-white rounded-lg shadow-2xl overflow-hidden">
-          {/* Foto placeholder */}
-          <div className="w-full h-64 bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center">
-            <span className="text-slate-500 text-lg">Foto do Patrimônio</span>
+        {/* Content */}
+        <div style={{ padding: '2rem' }}>
+          {/* QR Code Area */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '2rem',
+            marginBottom: '2rem',
+          }}>
+            <div style={{
+              background: '#f0f0f0',
+              border: '2px solid var(--color-border)',
+              borderRadius: '0.5rem',
+              aspectRatio: '1',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '0.9rem',
+              color: 'var(--color-text-secondary)',
+              textAlign: 'center',
+            }}>
+              <div>
+                <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📱</div>
+                <div>QR Code</div>
+              </div>
+            </div>
+
+            {/* ID Box */}
+            <div style={{
+              background: '#000000',
+              color: 'white',
+              borderRadius: '0.5rem',
+              display: 'flex',
+              alignItems: 'flex-end',
+              justifyContent: 'center',
+              padding: '1rem',
+              minHeight: '120px',
+            }}>
+              <div style={{
+                fontSize: '1.8rem',
+                fontWeight: '700',
+                fontFamily: 'monospace',
+                textAlign: 'center',
+                wordBreak: 'break-all',
+              }}>
+                {patrimonio.ID_PATRIMONIO}
+              </div>
+            </div>
           </div>
 
           {/* Informações */}
-          <div className="p-8">
-            <div className="mb-6 pb-6 border-b-2 border-[#D4AF37]">
-              <p className="text-sm text-slate-500 uppercase tracking-widest">ID</p>
-              <p className="text-3xl font-bold text-[#990033] font-mono">{patrimonio.ID_PATRIMONIO}</p>
-            </div>
+          <div style={{
+            borderTop: '2px solid var(--color-border)',
+            paddingTop: '1.5rem',
+          }}>
+            <h2 style={{
+              fontSize: '1.2rem',
+              fontWeight: '700',
+              color: 'var(--color-primary)',
+              marginBottom: '1rem',
+            }}>
+              Informações
+            </h2>
 
-            <div className="space-y-4">
+            <div style={{ display: 'grid', gap: '1rem' }}>
               <div>
-                <p className="text-xs text-slate-500 uppercase tracking-widest">Descrição</p>
-                <p className="text-lg text-slate-900 font-semibold">{patrimonio.DESCRICAO}</p>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  color: 'var(--color-text-secondary)',
+                  marginBottom: '0.25rem',
+                }}>
+                  Descrição
+                </label>
+                <p style={{ fontSize: '1rem', color: 'var(--color-text)' }}>
+                  {patrimonio.DESCRICAO}
+                </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs text-slate-500 uppercase tracking-widest">Centro de Custo</p>
-                  <p className="text-slate-900">{patrimonio.CENTRO_CUSTO}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500 uppercase tracking-widest">Status</p>
-                  <p className={`font-semibold ${patrimonio.STATUS === "ATIVO" ? "text-green-600" : "text-red-600"}`}>
-                    {patrimonio.STATUS}
-                  </p>
-                </div>
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  color: 'var(--color-text-secondary)',
+                  marginBottom: '0.25rem',
+                }}>
+                  Centro de Custo
+                </label>
+                <p style={{ fontSize: '1rem', color: 'var(--color-text)' }}>
+                  {patrimonio.CENTRO_CUSTO}
+                </p>
               </div>
 
               <div>
-                <p className="text-xs text-slate-500 uppercase tracking-widest">Localização</p>
-                <p className="text-slate-900">{patrimonio.LOCALIZACAO}</p>
-              </div>
-
-              <div>
-                <p className="text-xs text-slate-500 uppercase tracking-widest">Responsável</p>
-                <p className="text-slate-900">{patrimonio.RESPONSAVEL}</p>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  color: 'var(--color-text-secondary)',
+                  marginBottom: '0.25rem',
+                }}>
+                  Status
+                </label>
+                <p style={{
+                  fontSize: '1rem',
+                  color: patrimonio.STATUS === 'ATIVO' ? 'var(--color-success)' : 'var(--color-error)',
+                  fontWeight: '600',
+                }}>
+                  {patrimonio.STATUS}
+                </p>
               </div>
             </div>
           </div>
+        </div>
 
-          {/* Footer */}
-          <div className="bg-gradient-to-r from-[#990033] to-[#CC6699] px-8 py-4 text-white text-center">
-            <p className="text-sm">Última atualização: {new Date().toLocaleDateString("pt-BR")}</p>
-          </div>
+        {/* Footer */}
+        <div style={{
+          background: '#f9f8f6',
+          padding: '1rem',
+          textAlign: 'center',
+          borderTop: '1px solid var(--color-border)',
+        }}>
+          <button
+            onClick={() => onNavigate('home')}
+            className="btn btn-primary">
+            Voltar
+          </button>
         </div>
       </div>
     </div>
